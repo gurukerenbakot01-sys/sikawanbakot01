@@ -1,0 +1,7 @@
+{
+  "name": "Laporan Sikawan SDN Babelan Kota 01 2026",
+  "description": "Aplikasi Laporan Sikawan Harian & Bulanan SD NEGERI BABELAN KOTA 01 TAHUN 2026 dengan integrasi database Spreadsheet real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
