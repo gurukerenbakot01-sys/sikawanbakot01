@@ -201,7 +201,7 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
                     type="text"
                     value={spreadsheetId}
                     onChange={(e) => setSpreadsheetId(e.target.value)}
-                    placeholder="Contoh: 14t_sJ1jC-nQ6FzCPVw7K2xLk8X9uN2mYePqSdRgT4oE"
+                    placeholder="Contoh: 1-0gTmSV9aYBwmpGU1JcbZscmIn8u67z_SFTe9bn-P5c"
                     className="w-full px-3.5 py-2.5 font-mono text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-900 shadow-2xs"
                   />
                 </div>

@@ -12,10 +12,10 @@ const STORAGE_KEYS = {
 };
 
 export const DEFAULT_SPREADSHEET_CONFIG: SpreadsheetConfig = {
-  spreadsheetId: '14t_sJ1jC-nQ6FzCPVw7K2xLk8X9uN2mYePqSdRgT4oE', // Ready-to-use placeholder or customizable
+  spreadsheetId: '1-0gTmSV9aYBwmpGU1JcbZscmIn8u67z_SFTe9bn-P5c',
   sheetGuruName: 'Data_Guru',
   sheetRiwayatName: 'Riwayat_Pengiriman',
-  appsScriptUrl: '',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbxXFPikmMfI1z2jk_GlfDRPqwaywQB5T81GcQ_eEF3YjRkc1eESrFMrBxaT2I12sVjbHA/exec',
   isOnlineActive: true,
   lastSyncedAt: new Date().toISOString(),
 };
@@ -259,7 +259,30 @@ export function getSpreadsheetConfig(): SpreadsheetConfig {
       localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(DEFAULT_SPREADSHEET_CONFIG));
       return DEFAULT_SPREADSHEET_CONFIG;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    
+    // Ensure the official Spreadsheet ID & Apps Script Web App URL are permanently retained
+    let shouldUpdate = false;
+    const updated: SpreadsheetConfig = {
+      ...DEFAULT_SPREADSHEET_CONFIG,
+      ...parsed,
+    };
+
+    if (!parsed.spreadsheetId || parsed.spreadsheetId === '14t_sJ1jC-nQ6FzCPVw7K2xLk8X9uN2mYePqSdRgT4oE') {
+      updated.spreadsheetId = DEFAULT_SPREADSHEET_CONFIG.spreadsheetId;
+      shouldUpdate = true;
+    }
+
+    if (!parsed.appsScriptUrl || parsed.appsScriptUrl === '') {
+      updated.appsScriptUrl = DEFAULT_SPREADSHEET_CONFIG.appsScriptUrl;
+      shouldUpdate = true;
+    }
+
+    if (shouldUpdate) {
+      localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(updated));
+    }
+
+    return updated;
   } catch {
     return DEFAULT_SPREADSHEET_CONFIG;
   }

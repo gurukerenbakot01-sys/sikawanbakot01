@@ -78,6 +78,18 @@ export default function App() {
     setGuruList(loadedGuru);
     setRiwayatList(loadedLaporan);
     setConfig(loadedConfig);
+
+    // Auto-fetch teachers from permanent Google Spreadsheet / Apps Script Web App
+    if (loadedConfig.appsScriptUrl || loadedConfig.spreadsheetId) {
+      fetchGuruFromSpreadsheet(loadedConfig).then((fromSheet) => {
+        if (fromSheet && fromSheet.length > 0) {
+          setGuruList(fromSheet);
+          saveStoredGuruList(fromSheet);
+        }
+      }).catch(() => {
+        // graceful fallback to default teachers
+      });
+    }
   }, []);
 
   const showToast = (msg: string) => {
@@ -271,7 +283,7 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
                 <span>Penempatan ID Spreadsheet:</span>
                 <code className="font-mono bg-slate-100 text-emerald-900 px-2 py-0.5 rounded border border-slate-200 font-semibold">
-                  {config.spreadsheetId || '14t_sJ1jC-nQ6FzCPVw7K2xLk8X9uN2mYePqSdRgT4oE'}
+                  {config.spreadsheetId || '1-0gTmSV9aYBwmpGU1JcbZscmIn8u67z_SFTe9bn-P5c'}
                 </code>
               </div>
             </div>
