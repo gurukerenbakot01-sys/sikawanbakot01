@@ -93,12 +93,12 @@ function doGet(e) {
   
   if (action === "get_riwayat" || action === "get_all") {
     var sheetRiwayat = ss.getSheetByName("Riwayat_Pengiriman");
+    var riwayatList = [];
     if (sheetRiwayat) {
       var rData = sheetRiwayat.getDataRange().getValues();
       var rFormulas = sheetRiwayat.getDataRange().getFormulas();
-      var riwayatList = [];
       for (var j = 1; j < rData.length; j++) {
-        if (rData[j][0]) {
+        if (rData[j][0] && String(rData[j][0]).trim() !== "") {
           var harianRaw = String(rData[j][7] || "");
           var bulananRaw = String(rData[j][8] || "");
           var harianFormula = rFormulas[j] && rFormulas[j][7] ? String(rFormulas[j][7]) : "";
@@ -108,14 +108,14 @@ function doGet(e) {
           var bulananUrl = "";
 
           // Ekstrak URL dari formula =HYPERLINK("url", "label")
-          var hMatch = harianFormula.match(/HYPERLINK\\(\\s*["']([^"']+)["']/i);
+          var hMatch = harianFormula.match(/HYPERLINK\(\s*["']([^"']+)["']/i);
           if (hMatch) {
             harianUrl = hMatch[1];
           } else if (harianRaw.indexOf("http") === 0) {
             harianUrl = harianRaw;
           }
 
-          var bMatch = bulananFormula.match(/HYPERLINK\\(\\s*["']([^"']+)["']/i);
+          var bMatch = bulananFormula.match(/HYPERLINK\(\s*["']([^"']+)["']/i);
           if (bMatch) {
             bulananUrl = bMatch[1];
           } else if (bulananRaw.indexOf("http") === 0) {
@@ -139,8 +139,9 @@ function doGet(e) {
           });
         }
       }
-      result.riwayat = riwayatList;
     }
+    // Jika sheet Riwayat_Pengiriman dihapus atau kosong di spreadsheet, hasil riwayat adalah array kosong []
+    result.riwayat = riwayatList;
   }
   
   return ContentService.createTextOutput(JSON.stringify(result))
@@ -381,12 +382,17 @@ function parseFileCell(raw: string): { name: string; url?: string } {
  * Fetch online riwayat submissions from Google Spreadsheet
  */
 export async function fetchRiwayatFromSpreadsheet(config: SpreadsheetConfig): Promise<LaporanPengiriman[] | null> {
+  const cacheBuster = Date.now();
+
   // 1. Prioritize Google Apps Script Web App
   if (config.appsScriptUrl && config.appsScriptUrl.trim().startsWith('http')) {
     try {
-      const resp = await fetch(`${config.appsScriptUrl.trim()}?action=get_riwayat`, {
+      const separator = config.appsScriptUrl.includes('?') ? '&' : '?';
+      const fetchUrl = `${config.appsScriptUrl.trim()}${separator}action=get_riwayat&t=${cacheBuster}`;
+      const resp = await fetch(fetchUrl, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
+        cache: 'no-store',
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -416,6 +422,7 @@ export async function fetchRiwayatFromSpreadsheet(config: SpreadsheetConfig): Pr
               syncedToSpreadsheet: true,
             };
           });
+          // Mengembalikan list dari spreadsheet (termasuk [] jika seluruh data di spreadsheet telah dihapus)
           return list;
         }
       }
@@ -428,59 +435,80 @@ export async function fetchRiwayatFromSpreadsheet(config: SpreadsheetConfig): Pr
   if (config.spreadsheetId && config.spreadsheetId.trim().length > 10) {
     try {
       const sheetName = encodeURIComponent(config.sheetRiwayatName || 'Riwayat_Pengiriman');
-      const gvizUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId.trim()}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
-      const resp = await fetch(gvizUrl);
+      const gvizUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId.trim()}/gviz/tq?tqx=out:json&sheet=${sheetName}&t=${cacheBuster}`;
+      const resp = await fetch(gvizUrl, { cache: 'no-store' });
       if (resp.ok) {
         const text = await resp.text();
+        // Jika tab/sheet Riwayat_Pengiriman di spreadsheet telah dihapus
+        if (
+          text.includes('not found') || 
+          text.includes('INVALID_QUERY') || 
+          text.includes('INVALID_SHEET_NAME')
+        ) {
+          return [];
+        }
+
         const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+)\);/);
         if (jsonMatch && jsonMatch[1]) {
           const parsed = JSON.parse(jsonMatch[1]);
-          const rows = parsed.table?.rows || [];
-          if (rows.length > 0) {
-            const list: LaporanPengiriman[] = [];
-            rows.forEach((row: { c: Array<{ v: any; f?: string } | null> }, index: number) => {
-              const cells = row.c || [];
-              const id = cells[0]?.v ? String(cells[0].v) : `LAP-ONLINE-${index + 1}`;
-              const tanggalFormatted = cells[1]?.v ? String(cells[1].v) : '';
-              const namaGuru = cells[2]?.v ? String(cells[2].v) : '';
-              const nip = cells[3]?.v ? String(cells[3].v) : (cells[3]?.f ? String(cells[3].f) : '');
-              const jabatan = cells[4]?.v ? String(cells[4].v) : '';
-              const periodeBulan = cells[5]?.v ? String(cells[5].v) : '';
-              const tahun = cells[6]?.v ? String(cells[6].v) : (cells[6]?.f ? String(cells[6].f) : '2026');
-              const fileHarianRaw = cells[7]?.v ? String(cells[7].v) : (cells[7]?.f ? String(cells[7].f) : '');
-              const fileBulananRaw = cells[8]?.v ? String(cells[8].v) : (cells[8]?.f ? String(cells[8].f) : '');
-              const catatan = cells[9]?.v ? String(cells[9].v) : '';
-              const serverTime = cells[10]?.v ? String(cells[10].v) : '';
-
-              if (namaGuru) {
-                const harianParsed = parseFileCell(fileHarianRaw);
-                const bulananParsed = parseFileCell(fileBulananRaw);
-
-                list.push({
-                  id,
-                  tanggalUnggah: serverTime || new Date().toISOString(),
-                  tanggalFormatted: tanggalFormatted || 'Waktu tidak tercatat',
-                  namaGuru,
-                  nip,
-                  jabatan,
-                  periodeBulan,
-                  tahun,
-                  fileHarianName: harianParsed.name || 'Laporan-kinerja-pegawai-Harian.pdf',
-                  fileHarianSize: 0,
-                  fileHarianType: 'application/pdf',
-                  fileHarianDriveUrl: harianParsed.url,
-                  fileBulananName: bulananParsed.name || 'Laporan-kinerja-pegawai-Bulanan.pdf',
-                  fileBulananSize: 0,
-                  fileBulananType: 'application/pdf',
-                  fileBulananDriveUrl: bulananParsed.url,
-                  catatan,
-                  syncedToSpreadsheet: true,
-                });
-              }
-            });
-            if (list.length > 0) return list;
+          if (parsed.status === 'error') {
+            return [];
           }
+
+          const rows = parsed.table?.rows || [];
+          const list: LaporanPengiriman[] = [];
+          rows.forEach((row: { c: Array<{ v: any; f?: string } | null> }, index: number) => {
+            const cells = row.c || [];
+            const id = cells[0]?.v ? String(cells[0].v) : `LAP-ONLINE-${index + 1}`;
+            const tanggalFormatted = cells[1]?.v ? String(cells[1].v) : '';
+            const namaGuru = cells[2]?.v ? String(cells[2].v) : '';
+            const nip = cells[3]?.v ? String(cells[3].v) : (cells[3]?.f ? String(cells[3].f) : '');
+            const jabatan = cells[4]?.v ? String(cells[4].v) : '';
+            const periodeBulan = cells[5]?.v ? String(cells[5].v) : '';
+            const tahun = cells[6]?.v ? String(cells[6].v) : (cells[6]?.f ? String(cells[6].f) : '2026');
+            const fileHarianRaw = cells[7]?.v ? String(cells[7].v) : (cells[7]?.f ? String(cells[7].f) : '');
+            const fileBulananRaw = cells[8]?.v ? String(cells[8].v) : (cells[8]?.f ? String(cells[8].f) : '');
+            const catatan = cells[9]?.v ? String(cells[9].v) : '';
+            const serverTime = cells[10]?.v ? String(cells[10].v) : '';
+
+            // Pastikan baris memiliki nama guru valid dan bukan baris tajuk
+            if (
+              namaGuru && 
+              namaGuru.trim() !== '' && 
+              namaGuru.toLowerCase() !== 'nama guru' &&
+              id.toLowerCase() !== 'id pengiriman'
+            ) {
+              const harianParsed = parseFileCell(fileHarianRaw);
+              const bulananParsed = parseFileCell(fileBulananRaw);
+
+              list.push({
+                id,
+                tanggalUnggah: serverTime || new Date().toISOString(),
+                tanggalFormatted: tanggalFormatted || 'Waktu tidak tercatat',
+                namaGuru,
+                nip,
+                jabatan,
+                periodeBulan,
+                tahun,
+                fileHarianName: harianParsed.name || 'Laporan-kinerja-pegawai-Harian.pdf',
+                fileHarianSize: 0,
+                fileHarianType: 'application/pdf',
+                fileHarianDriveUrl: harianParsed.url,
+                fileBulananName: bulananParsed.name || 'Laporan-kinerja-pegawai-Bulanan.pdf',
+                fileBulananSize: 0,
+                fileBulananType: 'application/pdf',
+                fileBulananDriveUrl: bulananParsed.url,
+                catatan,
+                syncedToSpreadsheet: true,
+              });
+            }
+          });
+          // Mengembalikan list (termasuk [] jika seluruh baris di spreadsheet telah dihapus)
+          return list;
         }
+      } else {
+        // Jika response error karena sheet tidak ditemukan/dihapus
+        return [];
       }
     } catch (err) {
       console.warn('Error fetching riwayat via gviz:', err);

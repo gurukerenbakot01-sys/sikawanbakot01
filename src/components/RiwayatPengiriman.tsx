@@ -193,7 +193,7 @@ export const RiwayatPengiriman: React.FC<RiwayatPengirimanProps> = ({
           <span className="text-slate-600">•</span>
           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-[11px] text-emerald-300 font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Database Online Terhubung</span>
+            <span>Sinkronisasi Otomatis Spreadsheet Aktif</span>
           </div>
         </div>
       </div>
@@ -256,7 +256,7 @@ export const RiwayatPengiriman: React.FC<RiwayatPengirimanProps> = ({
             <p className="text-xs text-slate-500 max-w-sm mt-1">
               {searchQuery || selectedBulanFilter !== 'SEMUA'
                 ? 'Tidak ditemukan data dengan kata kunci tersebut. Coba reset pencarian.'
-                : 'Silakan lakukan pengunggahan formulir di sisi pertama untuk mencatat data Sikawan.'}
+                : 'Belum ada berkas pengiriman atau database di spreadsheet telah dikosongkan/dihapus. Riwayat tersinkronisasi otomatis secara real-time.'}
             </p>
           </div>
         ) : (

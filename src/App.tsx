@@ -81,7 +81,7 @@ export default function App() {
     setRiwayatList(loadedLaporan);
     setConfig(loadedConfig);
 
-    const syncInitialData = async (cfg: SpreadsheetConfig) => {
+    const syncOnlineDatabase = async (cfg: SpreadsheetConfig) => {
       // 1. Fetch Teachers from Spreadsheet
       try {
         const fromSheet = await fetchGuruFromSpreadsheet(cfg);
@@ -96,9 +96,18 @@ export default function App() {
       // 2. Fetch Riwayat Submissions from Spreadsheet (shows all teachers online)
       try {
         const fromRiwayat = await fetchRiwayatFromSpreadsheet(cfg);
-        if (fromRiwayat && fromRiwayat.length > 0) {
-          setRiwayatList(fromRiwayat);
-          saveStoredLaporanList(fromRiwayat);
+        // Penting: jika data di spreadsheet dihapus atau kosong, fromRiwayat berupa array kosong []
+        // State riwayatList dan localStorage di semua pengguna akan otomatis ikut terhapus
+        if (fromRiwayat !== null && Array.isArray(fromRiwayat)) {
+          setRiwayatList((prev) => {
+            const prevIds = prev.map((p) => p.id).join(',');
+            const newIds = fromRiwayat.map((p) => p.id).join(',');
+            if (prevIds !== newIds || prev.length !== fromRiwayat.length) {
+              saveStoredLaporanList(fromRiwayat);
+              return fromRiwayat;
+            }
+            return prev;
+          });
         }
       } catch {
         // fallback
@@ -106,16 +115,30 @@ export default function App() {
     };
 
     if (loadedConfig.appsScriptUrl || loadedConfig.spreadsheetId) {
-      syncInitialData(loadedConfig);
+      // Sinkronisasi langsung saat aplikasi dimuat
+      syncOnlineDatabase(loadedConfig);
 
-      // Periodic auto-sync every 25 seconds for multi-teacher live collaboration
+      // Sinkronisasi otomatis setiap 8 detik agar perubahan/penghapusan spreadsheet real-time di semua pengguna
       const intervalId = setInterval(() => {
-        syncInitialData(loadedConfig);
-      }, 25000);
+        syncOnlineDatabase(loadedConfig);
+      }, 8000);
 
-      return () => clearInterval(intervalId);
+      // Sinkronisasi langsung saat tab browser kembali dibuka / difokuskan
+      const handleTabActive = () => {
+        if (!document.hidden) {
+          syncOnlineDatabase(loadedConfig);
+        }
+      };
+      document.addEventListener('visibilitychange', handleTabActive);
+      window.addEventListener('focus', handleTabActive);
+
+      return () => {
+        clearInterval(intervalId);
+        document.removeEventListener('visibilitychange', handleTabActive);
+        window.removeEventListener('focus', handleTabActive);
+      };
     }
-  }, []);
+  }, [config.appsScriptUrl, config.spreadsheetId]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -148,14 +171,18 @@ export default function App() {
     setIsRefreshingRiwayat(true);
     try {
       const fromSheet = await fetchRiwayatFromSpreadsheet(config);
-      if (fromSheet && fromSheet.length > 0) {
+      if (fromSheet !== null && Array.isArray(fromSheet)) {
         setRiwayatList(fromSheet);
         saveStoredLaporanList(fromSheet);
         if (showNotification) {
-          showToast(`Berhasil menyinkronkan ${fromSheet.length} riwayat laporan online.`);
+          if (fromSheet.length === 0) {
+            showToast('Database spreadsheet kosong/telah dihapus. Riwayat direset secara otomatis.');
+          } else {
+            showToast(`Berhasil menyinkronkan ${fromSheet.length} riwayat laporan online.`);
+          }
         }
       } else if (showNotification) {
-        showToast('Riwayat laporan sudah mutakhir.');
+        showToast('Riwayat laporan sudah mutakhir dengan spreadsheet.');
       }
     } catch {
       if (showNotification) {
