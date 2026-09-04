@@ -57,7 +57,6 @@ export const FormSikawan: React.FC<FormSikawanProps> = ({
   const currentMonthIdx = new Date().getMonth();
   const [periodeBulan, setPeriodeBulan] = useState<string>(BULAN_OPTIONS[currentMonthIdx] || 'September');
   const [tahun, setTahun] = useState<string>('2026');
-  const [catatan, setCatatan] = useState<string>('');
 
   // Files State - MUST BE UPLOADED SIMULTANEOUSLY
   const [fileHarian, setFileHarian] = useState<File | null>(null);
@@ -150,13 +149,12 @@ export const FormSikawan: React.FC<FormSikawanProps> = ({
         tahun,
         fileHarian,
         fileBulanan,
-        catatan: catatan.trim(),
+        catatan: '',
       });
 
-      // Clear files and notes on success (preserve teacher selection for convenience)
+      // Clear files on success (preserve teacher selection for convenience)
       setFileHarian(null);
       setFileBulanan(null);
-      setCatatan('');
       if (fileHarianInputRef.current) fileHarianInputRef.current.value = '';
       if (fileBulananInputRef.current) fileBulananInputRef.current.value = '';
     } catch (err: any) {
@@ -346,14 +344,17 @@ export const FormSikawan: React.FC<FormSikawanProps> = ({
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Tahun
+                  Tahun (Pilih: 2026, 2027, 2028)
                 </label>
-                <input
-                  type="text"
+                <select
                   value={tahun}
-                  readOnly
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-100 border border-slate-200 rounded-md text-slate-700 font-bold"
-                />
+                  onChange={(e) => setTahun(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md text-slate-800 font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                  <option value="2028">2028</option>
+                </select>
               </div>
             </div>
 
@@ -553,20 +554,6 @@ export const FormSikawan: React.FC<FormSikawanProps> = ({
                   {fileBulanan ? '✓' : '✗'} Bulanan
                 </span>
               </div>
-            </div>
-
-            {/* Optional Notes */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Catatan / Keterangan Tambahan (Opsional)
-              </label>
-              <input
-                type="text"
-                value={catatan}
-                onChange={(e) => setCatatan(e.target.value)}
-                placeholder="Misal: Laporan minggu ke-1, modul ajar tematik, dll."
-                className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 text-slate-800"
-              />
             </div>
 
           </div>

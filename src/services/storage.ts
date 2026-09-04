@@ -105,13 +105,34 @@ export function generateDownloadFilename(
   return `${safeNama}_Laporan-kinerja-pegawai-${typeLabel}.${ext}`;
 }
 
+// Convert File to base64 string
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = reader.result as string;
+      const base64 = res.includes(',') ? res.split(',')[1] : res;
+      resolve(base64);
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
 // Helper to trigger file download in browser
 export async function downloadLaporanFile(
   laporanId: string, 
   type: 'harian' | 'bulanan', 
   originalFilename: string,
-  namaGuru?: string
+  namaGuru?: string,
+  driveUrl?: string
 ) {
+  // If a Google Drive link exists, open it directly in a new tab for instant view/download
+  if (driveUrl && (driveUrl.startsWith('http://') || driveUrl.startsWith('https://'))) {
+    window.open(driveUrl, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
   const fileKey = `${laporanId}_${type}`;
   let blob = await getFileFromIndexedDB(fileKey);
 
@@ -120,7 +141,8 @@ export async function downloadLaporanFile(
     : (originalFilename || `Sikawan_${type}_${laporanId}.pdf`);
 
   if (!blob) {
-    // If not found in IndexedDB (e.g. initial demo sample), generate a sample PDF/Text document
+    // If not found in IndexedDB (e.g. uploaded from another teacher's device without local cached file),
+    // generate a formatted summary PDF/document receipt
     const typeLabel = type === 'harian' ? 'Harian' : 'Bulanan';
     const content = `=====================================================
 LAPORAN SIKAWAN ${typeLabel.toUpperCase()} TAHUN 2026

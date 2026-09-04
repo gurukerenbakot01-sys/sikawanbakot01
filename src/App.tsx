@@ -31,10 +31,12 @@ import {
   saveSpreadsheetConfig, 
   saveFileToIndexedDB, 
   deleteFileFromIndexedDB, 
-  downloadLaporanFile 
+  downloadLaporanFile,
+  fileToBase64
 } from './services/storage';
 import { 
   fetchGuruFromSpreadsheet, 
+  fetchRiwayatFromSpreadsheet,
   syncLaporanToSpreadsheet, 
   deleteLaporanFromSpreadsheet, 
   exportRiwayatToCSV 
@@ -70,7 +72,7 @@ export default function App() {
   // Active View on Mobile / Tablet (Allows toggling between Side 1 and Side 2, or both on desktop)
   const [mobileView, setMobileView] = useState<'both' | 'form' | 'history'>('both');
 
-  // Load initial data
+  // Load initial data and sync with online spreadsheet
   useEffect(() => {
     const loadedGuru = getStoredGuruList();
     const loadedLaporan = getStoredLaporanList();
@@ -79,16 +81,39 @@ export default function App() {
     setRiwayatList(loadedLaporan);
     setConfig(loadedConfig);
 
-    // Auto-fetch teachers from permanent Google Spreadsheet / Apps Script Web App
-    if (loadedConfig.appsScriptUrl || loadedConfig.spreadsheetId) {
-      fetchGuruFromSpreadsheet(loadedConfig).then((fromSheet) => {
+    const syncInitialData = async (cfg: SpreadsheetConfig) => {
+      // 1. Fetch Teachers from Spreadsheet
+      try {
+        const fromSheet = await fetchGuruFromSpreadsheet(cfg);
         if (fromSheet && fromSheet.length > 0) {
           setGuruList(fromSheet);
           saveStoredGuruList(fromSheet);
         }
-      }).catch(() => {
-        // graceful fallback to default teachers
-      });
+      } catch {
+        // fallback
+      }
+
+      // 2. Fetch Riwayat Submissions from Spreadsheet (shows all teachers online)
+      try {
+        const fromRiwayat = await fetchRiwayatFromSpreadsheet(cfg);
+        if (fromRiwayat && fromRiwayat.length > 0) {
+          setRiwayatList(fromRiwayat);
+          saveStoredLaporanList(fromRiwayat);
+        }
+      } catch {
+        // fallback
+      }
+    };
+
+    if (loadedConfig.appsScriptUrl || loadedConfig.spreadsheetId) {
+      syncInitialData(loadedConfig);
+
+      // Periodic auto-sync every 25 seconds for multi-teacher live collaboration
+      const intervalId = setInterval(() => {
+        syncInitialData(loadedConfig);
+      }, 25000);
+
+      return () => clearInterval(intervalId);
     }
   }, []);
 
@@ -115,6 +140,29 @@ export default function App() {
       showToast('Gagal menarik data guru dari spreadsheet. Memakai data lokal.');
     } finally {
       setIsRefreshingGuru(false);
+    }
+  };
+
+  // Pull latest submissions from spreadsheet (all teachers)
+  const handleRefreshRiwayat = async (showNotification = false) => {
+    setIsRefreshingRiwayat(true);
+    try {
+      const fromSheet = await fetchRiwayatFromSpreadsheet(config);
+      if (fromSheet && fromSheet.length > 0) {
+        setRiwayatList(fromSheet);
+        saveStoredLaporanList(fromSheet);
+        if (showNotification) {
+          showToast(`Berhasil menyinkronkan ${fromSheet.length} riwayat laporan online.`);
+        }
+      } else if (showNotification) {
+        showToast('Riwayat laporan sudah mutakhir.');
+      }
+    } catch {
+      if (showNotification) {
+        showToast('Gagal menyinkronkan data riwayat online.');
+      }
+    } finally {
+      setIsRefreshingRiwayat(false);
     }
   };
 
@@ -150,6 +198,16 @@ export default function App() {
       await saveFileToIndexedDB(`${newId}_harian`, formData.fileHarian);
       await saveFileToIndexedDB(`${newId}_bulanan`, formData.fileBulanan);
 
+      // Convert files to base64 for direct Google Drive PDF upload
+      let fileHarianBase64 = '';
+      let fileBulananBase64 = '';
+      try {
+        fileHarianBase64 = await fileToBase64(formData.fileHarian);
+        fileBulananBase64 = await fileToBase64(formData.fileBulanan);
+      } catch (errB64) {
+        console.warn('Base64 encoding fallback:', errB64);
+      }
+
       const newLaporan: LaporanPengiriman = {
         id: newId,
         tanggalUnggah: now.toISOString(),
@@ -169,13 +227,18 @@ export default function App() {
         syncedToSpreadsheet: true,
       };
 
-      // Push to Google Spreadsheet asynchronously
-      syncLaporanToSpreadsheet(newLaporan, config);
+      // Push to Google Spreadsheet & Google Drive with PDF Link generation
+      syncLaporanToSpreadsheet(newLaporan, config, fileHarianBase64, fileBulananBase64);
 
-      // Update state and persistence
+      // Update state and persistence immediately
       const updatedList = [newLaporan, ...riwayatList];
       setRiwayatList(updatedList);
       saveStoredLaporanList(updatedList);
+
+      // Trigger automatic background refresh to obtain generated Drive URL link
+      setTimeout(() => {
+        handleRefreshRiwayat(false);
+      }, 3000);
 
       // Show the requested Success Popup notification
       setSuccessLaporan(newLaporan);
@@ -193,10 +256,11 @@ export default function App() {
     id: string, 
     type: 'harian' | 'bulanan', 
     filename: string, 
-    namaGuru?: string
+    namaGuru?: string,
+    driveUrl?: string
   ) => {
     try {
-      await downloadLaporanFile(id, type, filename, namaGuru);
+      await downloadLaporanFile(id, type, filename, namaGuru, driveUrl);
     } catch (err) {
       console.error('Failed to download file:', err);
       showToast('Gagal mengunduh file.');
@@ -357,9 +421,7 @@ export default function App() {
               onDownloadFile={handleDownloadFile}
               onDeleteLaporan={handleDeleteLaporan}
               onExportCSV={handleExportCSV}
-              onRefreshData={() => {
-                showToast('Menyegarkan tabel riwayat pengiriman...');
-              }}
+              onRefreshData={() => handleRefreshRiwayat(true)}
               isRefreshing={isRefreshingRiwayat}
             />
           </div>

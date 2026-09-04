@@ -12,14 +12,15 @@ import {
   Filter, 
   AlertTriangle,
   FileCheck,
-  UserCheck
+  UserCheck,
+  ExternalLink
 } from 'lucide-react';
 import { LaporanPengiriman } from '../types';
 import { generateDownloadFilename } from '../services/storage';
 
 interface RiwayatPengirimanProps {
   riwayatList: LaporanPengiriman[];
-  onDownloadFile: (id: string, type: 'harian' | 'bulanan', filename: string, namaGuru: string) => Promise<void>;
+  onDownloadFile: (id: string, type: 'harian' | 'bulanan', filename: string, namaGuru: string, driveUrl?: string) => Promise<void>;
   onDeleteLaporan: (id: string) => Promise<void>;
   onExportCSV: () => void;
   onRefreshData?: () => void;
@@ -63,10 +64,16 @@ export const RiwayatPengiriman: React.FC<RiwayatPengirimanProps> = ({
   const totalPengiriman = riwayatList.length;
   const uniqueGuruCount = new Set(riwayatList.map((r) => r.nip || r.namaGuru)).size;
 
-  const handleDownload = async (id: string, type: 'harian' | 'bulanan', filename: string, namaGuru: string) => {
+  const handleDownload = async (
+    id: string, 
+    type: 'harian' | 'bulanan', 
+    filename: string, 
+    namaGuru: string,
+    driveUrl?: string
+  ) => {
     setDownloadingKey(`${id}_${type}`);
     try {
-      await onDownloadFile(id, type, filename, namaGuru);
+      await onDownloadFile(id, type, filename, namaGuru, driveUrl);
     } finally {
       setTimeout(() => setDownloadingKey(null), 500);
     }
@@ -184,9 +191,10 @@ export const RiwayatPengiriman: React.FC<RiwayatPengirimanProps> = ({
             <span>Guru Melapor: <strong className="text-white">{uniqueGuruCount}</strong> Guru</span>
           </div>
           <span className="text-slate-600">•</span>
-          <span className="text-slate-400 text-[11px]">
-            Tersimpan Otomatis di Google Spreadsheet
-          </span>
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-[11px] text-emerald-300 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Database Online Terhubung</span>
+          </div>
         </div>
       </div>
 
@@ -199,7 +207,7 @@ export const RiwayatPengiriman: React.FC<RiwayatPengirimanProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari Nama Guru, NIP, berkas..."
+            placeholder="Cari Nama Guru, berkas..."
             className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 text-slate-800"
           />
           {searchQuery && (
@@ -257,14 +265,13 @@ export const RiwayatPengiriman: React.FC<RiwayatPengirimanProps> = ({
               <tr className="bg-slate-100/90 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-3.5 whitespace-nowrap">Tanggal Unggah</th>
                 <th className="py-3 px-3.5">Nama Guru</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">NIP</th>
-                <th className="py-3 px-3.5 text-center min-w-[240px]">
+                <th className="py-3 px-3.5 text-center min-w-[220px]">
                   <div className="inline-flex items-center gap-1">
                     <Download className="w-3.5 h-3.5 text-emerald-700" />
                     <span>Unduh File</span>
                   </div>
                   <div className="text-[10px] font-medium text-slate-500 normal-case tracking-normal">
-                    (File Harian & Bulanan)
+                    (Harian & Bulanan)
                   </div>
                 </th>
                 <th className="py-3 px-3.5 text-center w-28 whitespace-nowrap">Tombol Hapus</th>
@@ -296,50 +303,66 @@ export const RiwayatPengiriman: React.FC<RiwayatPengirimanProps> = ({
                       <div className="font-bold text-slate-900 text-xs">
                         {item.namaGuru}
                       </div>
+                      {item.jabatan && (
+                        <div className="text-[11px] text-slate-500 font-normal">
+                          {item.jabatan}
+                        </div>
+                      )}
                     </td>
 
-                    {/* 3. NIP */}
-                    <td className="py-3.5 px-3.5 font-mono text-slate-700 font-semibold whitespace-nowrap">
-                      {item.nip || '-'}
-                    </td>
-
-                    {/* 4. Unduh File: Satu Kolom Dibagi File Harian dan Bulanan */}
+                    {/* 3. Unduh File: Harian dan Bulanan */}
                     <td className="py-3.5 px-3.5 text-center">
                       <div className="inline-flex items-center gap-1.5 p-1 bg-slate-50/90 rounded-xl border border-slate-200">
-                        {/* Tombol File Harian */}
+                        {/* Tombol Harian */}
                         <button
                           type="button"
-                          onClick={() => handleDownload(item.id, 'harian', item.fileHarianName, item.namaGuru)}
+                          onClick={() => handleDownload(item.id, 'harian', item.fileHarianName, item.namaGuru, item.fileHarianDriveUrl)}
                           disabled={isDownloadingHarian}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200/80 text-emerald-800 font-semibold text-[11px] transition shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50 group/btn"
-                          title={`Unduh Sikawan Harian: ${harianDownloadName}`}
+                          title={item.fileHarianDriveUrl ? `Buka Link PDF Google Drive: ${harianDownloadName}` : `Unduh Sikawan Harian: ${harianDownloadName}`}
                         >
-                          <Download className={`w-3.5 h-3.5 text-emerald-700 shrink-0 ${isDownloadingHarian ? 'animate-bounce' : 'group-hover/btn:scale-110 transition-transform'}`} />
-                          <span className="font-bold text-emerald-950">File Harian</span>
-                          {item.fileHarianSize > 0 && (
+                          {item.fileHarianDriveUrl ? (
+                            <ExternalLink className="w-3.5 h-3.5 text-emerald-700 shrink-0 group-hover/btn:scale-110 transition-transform" />
+                          ) : (
+                            <Download className={`w-3.5 h-3.5 text-emerald-700 shrink-0 ${isDownloadingHarian ? 'animate-bounce' : 'group-hover/btn:scale-110 transition-transform'}`} />
+                          )}
+                          <span className="font-bold text-emerald-950">Harian</span>
+                          {item.fileHarianDriveUrl ? (
+                            <span className="text-[9px] text-emerald-800 font-bold bg-emerald-200/80 px-1 py-0.5 rounded">
+                              Link PDF
+                            </span>
+                          ) : item.fileHarianSize > 0 ? (
                             <span className="text-[10px] text-emerald-700 font-mono font-normal">
                               ({formatFileSize(item.fileHarianSize)})
                             </span>
-                          )}
+                          ) : null}
                         </button>
 
                         <span className="text-slate-300 font-light select-none">|</span>
 
-                        {/* Tombol File Bulanan */}
+                        {/* Tombol Bulanan */}
                         <button
                           type="button"
-                          onClick={() => handleDownload(item.id, 'bulanan', item.fileBulananName, item.namaGuru)}
+                          onClick={() => handleDownload(item.id, 'bulanan', item.fileBulananName, item.namaGuru, item.fileBulananDriveUrl)}
                           disabled={isDownloadingBulanan}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 active:bg-teal-200 border border-teal-200/80 text-teal-800 font-semibold text-[11px] transition shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50 group/btn"
-                          title={`Unduh Sikawan Bulanan: ${bulananDownloadName}`}
+                          title={item.fileBulananDriveUrl ? `Buka Link PDF Google Drive: ${bulananDownloadName}` : `Unduh Sikawan Bulanan: ${bulananDownloadName}`}
                         >
-                          <Download className={`w-3.5 h-3.5 text-teal-700 shrink-0 ${isDownloadingBulanan ? 'animate-bounce' : 'group-hover/btn:scale-110 transition-transform'}`} />
-                          <span className="font-bold text-teal-950">File Bulanan</span>
-                          {item.fileBulananSize > 0 && (
+                          {item.fileBulananDriveUrl ? (
+                            <ExternalLink className="w-3.5 h-3.5 text-teal-700 shrink-0 group-hover/btn:scale-110 transition-transform" />
+                          ) : (
+                            <Download className={`w-3.5 h-3.5 text-teal-700 shrink-0 ${isDownloadingBulanan ? 'animate-bounce' : 'group-hover/btn:scale-110 transition-transform'}`} />
+                          )}
+                          <span className="font-bold text-teal-950">Bulanan</span>
+                          {item.fileBulananDriveUrl ? (
+                            <span className="text-[9px] text-teal-800 font-bold bg-teal-200/80 px-1 py-0.5 rounded">
+                              Link PDF
+                            </span>
+                          ) : item.fileBulananSize > 0 ? (
                             <span className="text-[10px] text-teal-700 font-mono font-normal">
                               ({formatFileSize(item.fileBulananSize)})
                             </span>
-                          )}
+                          ) : null}
                         </button>
                       </div>
                     </td>
