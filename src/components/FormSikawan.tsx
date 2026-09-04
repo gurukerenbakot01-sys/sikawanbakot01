@@ -241,20 +241,20 @@ export const FormSikawan: React.FC<FormSikawanProps> = ({
                 <select
                   value={selectedGuruId}
                   onChange={handleSelectGuru}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-slate-900 shadow-2xs"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-slate-900 shadow-2xs cursor-pointer"
                   required
                 >
-                  <option value="">-- Klik untuk Memilih Nama Guru --</option>
+                  <option value="">Pilih Nama Guru</option>
                   {guruList.map((guru) => (
                     <option key={guru.id} value={guru.id}>
-                      {guru.nama} - {guru.jabatan}
+                      {guru.nama}
                     </option>
                   ))}
                   <option value="MANUAL">+ Masukkan Nama Guru Baru (Manual)</option>
                 </select>
                 <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                   <Info className="w-3 h-3 text-slate-400" />
-                  NIP dan Jabatan otomatis terisi saat nama guru dipilih.
+                  NIP / NIPPPK / NUPTK dan Jabatan otomatis terisi saat memilih nama guru.
                 </p>
               </div>
             ) : (
@@ -289,7 +289,7 @@ export const FormSikawan: React.FC<FormSikawanProps> = ({
                     type="text"
                     value={nip}
                     onChange={(e) => setNip(e.target.value)}
-                    placeholder="19820315 200604 2 018"
+                    placeholder={!isManualInput ? 'Otomatis terisi saat memilih nama guru' : '19820315 200604 2 018'}
                     readOnly={!isManualInput && !!selectedGuruId}
                     className={`w-full pl-9.5 pr-3.5 py-2.5 text-sm rounded-lg border font-mono ${
                       !isManualInput && !!selectedGuruId
@@ -312,7 +312,7 @@ export const FormSikawan: React.FC<FormSikawanProps> = ({
                     type="text"
                     value={jabatan}
                     onChange={(e) => setJabatan(e.target.value)}
-                    placeholder="Contoh: Guru Kelas 6A / Guru PAI"
+                    placeholder={!isManualInput ? 'Otomatis terisi saat memilih nama guru' : 'Contoh: Guru Kelas 6A / Guru PAI'}
                     readOnly={!isManualInput && !!selectedGuruId}
                     className={`w-full pl-9.5 pr-3.5 py-2.5 text-sm rounded-lg border ${
                       !isManualInput && !!selectedGuruId
