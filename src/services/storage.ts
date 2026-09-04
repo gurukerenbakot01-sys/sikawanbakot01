@@ -170,78 +170,36 @@ Laporan ini adalah dokumen resmi kinerja pegawai SD Negeri Babelan Kota 01.`;
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-// Initial default reports for SD NEGERI BABELAN KOTA 01
-const DEFAULT_LAPORAN: LaporanPengiriman[] = [
-  {
-    id: 'LAP-20260901-001',
-    tanggalUnggah: '2026-09-01T08:30:00.000Z',
-    tanggalFormatted: '01 September 2026, 08:30 WIB',
-    guruId: 'GUR-001',
-    namaGuru: 'Hj. Siti Rohmah, S.Pd., M.M.',
-    nip: '19680512 199303 2 004',
-    jabatan: 'Kepala Sekolah',
-    periodeBulan: 'September',
-    tahun: '2026',
-    fileHarianName: 'Sikawan_Harian_01Sep2026_SitiRohmah.pdf',
-    fileHarianSize: 428000,
-    fileHarianType: 'application/pdf',
-    fileBulananName: 'Sikawan_Bulanan_Agustus2026_SitiRohmah.xlsx',
-    fileBulananSize: 856000,
-    fileBulananType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    catatan: 'Laporan manajerial dan supervisi harian serta rekap bulanan.',
-    syncedToSpreadsheet: true,
-  },
-  {
-    id: 'LAP-20260902-002',
-    tanggalUnggah: '2026-09-02T09:15:00.000Z',
-    tanggalFormatted: '02 September 2026, 09:15 WIB',
-    guruId: 'GUR-002',
-    namaGuru: 'Ahmad Fauzi, S.Pd.SD',
-    nip: '19750819 199803 1 003',
-    jabatan: 'Guru Kelas 6A',
-    periodeBulan: 'September',
-    tahun: '2026',
-    fileHarianName: 'Sikawan_Harian_02Sep2026_AhmadFauzi.pdf',
-    fileHarianSize: 312000,
-    fileHarianType: 'application/pdf',
-    fileBulananName: 'Sikawan_Bulanan_Agustus2026_AhmadFauzi.pdf',
-    fileBulananSize: 645000,
-    fileBulananType: 'application/pdf',
-    catatan: 'Pembelajaran tematik persiapan asesmen formatif.',
-    syncedToSpreadsheet: true,
-  },
-  {
-    id: 'LAP-20260903-003',
-    tanggalUnggah: '2026-09-03T07:45:00.000Z',
-    tanggalFormatted: '03 September 2026, 07:45 WIB',
-    guruId: 'GUR-014',
-    namaGuru: 'Ustadz H. Mahfudz, S.Pd.I.',
-    nip: '19790312 200501 1 006',
-    jabatan: 'Guru Pendidikan Agama Islam (PAI)',
-    periodeBulan: 'September',
-    tahun: '2026',
-    fileHarianName: 'Sikawan_Harian_03Sep2026_Mahfudz.pdf',
-    fileHarianSize: 289000,
-    fileHarianType: 'application/pdf',
-    fileBulananName: 'Sikawan_Bulanan_Agustus2026_Mahfudz.docx',
-    fileBulananSize: 512000,
-    fileBulananType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    catatan: 'Praktik ibadah sholat dhuha berjamaah dan hafalan surat pendek.',
-    syncedToSpreadsheet: true,
-  },
-];
+// Initial default reports for SD NEGERI BABELAN KOTA 01 - kosong secara bawaan
+const DEFAULT_LAPORAN: LaporanPengiriman[] = [];
 
 // LocalStorage Wrappers
 export function getStoredLaporanList(): LaporanPengiriman[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LAPORAN);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.LAPORAN, JSON.stringify(DEFAULT_LAPORAN));
-      return DEFAULT_LAPORAN;
+      localStorage.setItem(STORAGE_KEYS.LAPORAN, JSON.stringify([]));
+      return [];
     }
-    return JSON.parse(raw);
+    const parsed: LaporanPengiriman[] = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    // Filter out old sample mock reports if present in user's browser localStorage
+    const cleaned = parsed.filter(
+      (item) => 
+        item && 
+        item.id && 
+        !item.id.startsWith('LAP-20260901-') && 
+        !item.id.startsWith('LAP-20260902-') && 
+        !item.id.startsWith('LAP-20260903-')
+    );
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem(STORAGE_KEYS.LAPORAN, JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
-    return DEFAULT_LAPORAN;
+    return [];
   }
 }
 
